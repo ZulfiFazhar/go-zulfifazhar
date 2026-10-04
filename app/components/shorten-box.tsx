@@ -14,16 +14,20 @@ export interface ShortenBoxProps {
   user?: { userId: string; email: string } | null;
   initialResult?: ShortenResult | null;
   initialError?: string | null;
+  onCreated?: (result: ShortenResult) => void;
+  defaultCustomSlugOpen?: boolean;
 }
 
 export function ShortenBox({
   user,
   initialResult = null,
   initialError = null,
+  onCreated,
+  defaultCustomSlugOpen = false,
 }: ShortenBoxProps) {
   const [url, setUrl] = React.useState("");
   const [customSlug, setCustomSlug] = React.useState("");
-  const [showCustomSlug, setShowCustomSlug] = React.useState(false);
+  const [showCustomSlug, setShowCustomSlug] = React.useState(defaultCustomSlugOpen);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(initialError);
   const [result, setResult] = React.useState<ShortenResult | null>(initialResult);
@@ -115,12 +119,15 @@ export function ShortenBox({
         displayShortUrl = `${origin}${displayShortUrl}`;
       }
 
-      setResult({
+      const shortened: ShortenResult = {
         id: data.id,
         slug: data.slug,
         targetUrl: data.targetUrl || trimmedUrl,
         shortUrl: displayShortUrl,
-      });
+      };
+
+      setResult(shortened);
+      onCreated?.(shortened);
     } catch (err: any) {
       setError(err?.message || "An unexpected error occurred. Please try again.");
     } finally {
