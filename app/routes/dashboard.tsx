@@ -14,6 +14,7 @@ import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
 import { listUserLinks } from "../../workers/db/queries";
 import { Link2, BarChart3, TrendingUp, PlusCircle } from "lucide-react";
+import { claimLocalHistory } from "../lib/local-history";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -83,6 +84,22 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
       setLinks(loaderData.links);
     }
   }, [loaderData?.links]);
+
+  // Claim any anonymous links saved in local storage before login
+  React.useEffect(() => {
+    claimLocalHistory().then((count) => {
+      if (count > 0) {
+        fetch("/api/user/links")
+          .then((res) => res.json())
+          .then((data: any) => {
+            if (data?.links) {
+              setLinks(data.links);
+            }
+          })
+          .catch(() => {});
+      }
+    });
+  }, []);
 
   const handleLinkCreated = (newResult: ShortenResult) => {
     const newLink: DashboardLinkItem = {

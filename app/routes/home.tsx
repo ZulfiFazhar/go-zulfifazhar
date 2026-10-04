@@ -1,11 +1,15 @@
+import * as React from "react";
 import type { Route } from "./+types/home";
 import { motion } from "framer-motion";
 import { Navbar, type NavbarUser } from "../components/navbar";
-import { ShortenBox } from "../components/shorten-box";
+import { ShortenBox, type ShortenResult } from "../components/shorten-box";
 import { FeaturesGrid } from "../components/features-grid";
+import { RecentLinks, type RecentLinkItem } from "../components/recent-links";
 import { Badge } from "../components/ui/badge";
 import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
+import { listUserLinks } from "../../workers/db/queries";
+import { claimLocalHistory } from "../lib/local-history";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -20,6 +24,7 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   let user: NavbarUser | null = null;
+  let recentLinks: RecentLinkItem[] = [];
 
   try {
     const cookieHeader = request.headers.get("Cookie") || "";
@@ -29,17 +34,65 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       const secret = cf?.env?.JWT_SECRET;
       if (secret) {
         user = await verifySessionJwt(match[1], secret);
+
+        if (user && cf?.env?.SHORTENER_DB) {
+          const records = await listUserLinks(cf.env.SHORTENER_DB, user.userId);
+          const base = cf.env.BASE_URL
+            ? cf.env.BASE_URL.replace(/\/$/, "")
+            : "https://go.zulfifazhar.dev";
+
+          recentLinks = records.slice(0, 5).map((r) => ({
+            id: r.id,
+            slug: r.slug,
+            targetUrl: r.target_url,
+            shortUrl: `${base}/${r.slug}`,
+            clicks: r.clicks,
+            createdAt: r.created_at,
+          }));
+        }
       }
     }
   } catch {
     // If context unavailable or JWT invalid, default to null
   }
 
-  return { user };
+  return { user, recentLinks };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user ?? null;
+  const initialRecent = loaderData?.recentLinks ?? [];
+  const [recentLinks, setRecentLinks] = React.useState<RecentLinkItem[]>(initialRecent);
+
+  // Sync state if loader data changes
+  React.useEffect(() => {
+    if (loaderData?.recentLinks) {
+      setRecentLinks(loaderData.recentLinks);
+    }
+  }, [loaderData?.recentLinks]);
+
+  // Auto-claim local storage history if user is logged in
+  React.useEffect(() => {
+    if (user) {
+      claimLocalHistory().then((count) => {
+        if (count > 0) {
+          // Re-fetch or keep current state
+        }
+      });
+    }
+  }, [user]);
+
+  const handleCreated = (result: ShortenResult) => {
+    const newItem: RecentLinkItem = {
+      id: result.id,
+      slug: result.slug,
+      targetUrl: result.targetUrl,
+      shortUrl: result.shortUrl,
+      clicks: 0,
+      createdAt: Date.now(),
+    };
+    setRecentLinks((prev) => [newItem, ...prev.filter((l) => l.id !== newItem.id)].slice(0, 5));
+  };
 
   return (
     <div className="min-h-screen bg-white text-[#262626] flex flex-col justify-between">
@@ -91,8 +144,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="mt-8 sm:mt-10 w-full"
             >
-              <ShortenBox user={user} />
+              <ShortenBox user={user} onCreated={handleCreated} />
             </motion.div>
+
+            {/* Recent Links (Local History or User Synced) */}
+            <RecentLinks user={user} serverLinks={recentLinks} />
           </div>
         </section>
 

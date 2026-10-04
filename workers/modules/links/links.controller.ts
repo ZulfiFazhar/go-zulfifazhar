@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import type { AppEnv } from "../../context";
 import { createShortLink } from "./links.service";
-import { listUserLinks, deleteUserLink, type LinkRecord } from "../../db/queries";
+import { listUserLinks, deleteUserLink, claimAnonymousLinks, type LinkRecord } from "../../db/queries";
 import { authMiddleware, requireAuth } from "../auth/auth.middleware";
 import { verifySessionJwt } from "../auth/auth.service";
 
@@ -131,10 +131,40 @@ export async function handleDeleteUserLink(c: Context<AppEnv>) {
   }
 }
 
+export async function handleClaimLinks(c: Context<AppEnv>) {
+  const user = c.get("user");
+  if (!user?.userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let body: any;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const linkIds = Array.isArray(body?.linkIds)
+    ? body.linkIds.filter((id: any) => typeof id === "string" && id.trim().length > 0)
+    : [];
+
+  if (linkIds.length === 0) {
+    return c.json({ success: true, claimedCount: 0 });
+  }
+
+  try {
+    const claimedCount = await claimAnonymousLinks(c.env.SHORTENER_DB, user.userId, linkIds);
+    return c.json({ success: true, claimedCount });
+  } catch (err: any) {
+    return c.json({ error: err?.message || "Failed to claim links" }, 500);
+  }
+}
+
 export const linksRoutes = new Hono<AppEnv>();
 linksRoutes.use("*", authMiddleware);
 linksRoutes.post("/", handleCreateLink);
 linksRoutes.post("/links", handleCreateLink);
+linksRoutes.post("/claim", requireAuth, handleClaimLinks);
 linksRoutes.get("/", requireAuth, handleListUserLinks);
 linksRoutes.get("/user/links", requireAuth, handleListUserLinks);
 linksRoutes.delete("/:id", requireAuth, handleDeleteUserLink);
@@ -143,4 +173,5 @@ linksRoutes.delete("/user/links/:id", requireAuth, handleDeleteUserLink);
 export const userLinksRoutes = new Hono<AppEnv>();
 userLinksRoutes.use("*", authMiddleware, requireAuth);
 userLinksRoutes.get("/", handleListUserLinks);
+userLinksRoutes.post("/claim", handleClaimLinks);
 userLinksRoutes.delete("/:id", handleDeleteUserLink);

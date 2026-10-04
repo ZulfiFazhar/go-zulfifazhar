@@ -136,6 +136,21 @@ export async function deleteUserLink(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+export async function claimAnonymousLinks(
+  db: D1Database,
+  userId: string,
+  linkIds: string[]
+): Promise<number> {
+  if (!linkIds || linkIds.length === 0) return 0;
+  // ponytail: cap at 50 links per batch to prevent SQL parameter limits
+  const safeIds = linkIds.slice(0, 50);
+  const placeholders = safeIds.map(() => "?").join(",");
+  const now = Date.now();
+  const query = `UPDATE links SET user_id = ?, updated_at = ? WHERE id IN (${placeholders}) AND user_id IS NULL`;
+  const result = await db.prepare(query).bind(userId, now, ...safeIds).run();
+  return result.meta?.changes ?? 0;
+}
+
 export async function upsertUserRecord(
   db: D1Database,
   data: UserInsert

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Copy, Check, ExternalLink, Loader2, ArrowRight, AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { addLocalHistory } from "../lib/local-history";
 
 export interface ShortenResult {
   id: string;
@@ -126,6 +127,10 @@ export function ShortenBox({
         targetUrl: data.targetUrl || trimmedUrl,
         shortUrl: displayShortUrl,
       };
+
+      if (!user) {
+        addLocalHistory(shortened);
+      }
 
       setResult(shortened);
       onCreated?.(shortened);
