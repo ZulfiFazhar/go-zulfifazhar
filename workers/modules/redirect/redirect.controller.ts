@@ -45,13 +45,13 @@ export function extractClickMeta(c: Context<any>): ClickMeta {
   return { country, referrer, user_agent };
 }
 
-export async function recordClick(c: Context<{ Bindings: Env }>, linkId: string): Promise<void> {
+export async function recordClick(c: Context<any>, linkId: string): Promise<void> {
   const meta = extractClickMeta(c);
   await incrementLinkClicks(c.env.SHORTENER_DB, linkId, meta);
 }
 
 export async function handleEdgeRedirect(
-  c: Context<{ Bindings: Env }>
+  c: Context<any>
 ): Promise<Response | null> {
   let slug: string | null = null;
 

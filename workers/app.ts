@@ -1,24 +1,55 @@
 import { Hono } from "hono";
 import { createRequestHandler, RouterContextProvider } from "react-router";
 import { cloudflareContext } from "../app/context";
+import type { AppEnv } from "./context";
+import { authRoutes } from "./modules/auth/auth.controller";
+import { linksRoutes, userLinksRoutes } from "./modules/links/links.controller";
+import { handleEdgeRedirect } from "./modules/redirect/redirect.controller";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppEnv>();
 
-// Add more routes here
+// API modular routes
+app.route("/api/auth", authRoutes);
+app.route("/api/links", linksRoutes);
+app.route("/api/user/links", userLinksRoutes);
 
-app.get("*", (c) => {
-  const requestHandler = createRequestHandler(
-    () => import("virtual:react-router/server-build"),
-    import.meta.env.MODE,
-  );
+// High-speed edge redirect handler
+app.get("/:slug", async (c, next) => {
+  const redirectResponse = await handleEdgeRedirect(c);
+  if (redirectResponse) {
+    return redirectResponse;
+  }
+  return next();
+});
 
-  const routerContext = new RouterContextProvider();
-  routerContext.set(cloudflareContext, {
-    env: c.env,
-    ctx: c.executionCtx,
-  });
+// React Router SSR fallback handler
+app.get("*", async (c) => {
+  try {
+    const requestHandler = createRequestHandler(
+      () => import("virtual:react-router/server-build"),
+      import.meta.env.MODE,
+    );
 
-  return requestHandler(c.req.raw, routerContext);
+    let executionCtx: any;
+    try {
+      executionCtx = c.executionCtx;
+    } catch {
+      executionCtx = {
+        waitUntil: () => {},
+        passThroughOnException: () => {},
+      };
+    }
+
+    const routerContext = new RouterContextProvider();
+    routerContext.set(cloudflareContext, {
+      env: c.env as any,
+      ctx: executionCtx,
+    });
+
+    return await requestHandler(c.req.raw, routerContext);
+  } catch {
+    return c.text("Not Found", 404);
+  }
 });
 
 export default app;
