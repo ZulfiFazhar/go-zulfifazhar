@@ -5,10 +5,12 @@ import { Navbar, type NavbarUser } from "../components/navbar";
 import { ShortenBox, type ShortenResult } from "../components/shorten-box";
 import { FeaturesGrid } from "../components/features-grid";
 import { RecentLinks, type RecentLinkItem } from "../components/recent-links";
+import { AnimatedBackground } from "../components/animated-background";
+import { LiveStatsChart, type PlatformStats } from "../components/live-stats-chart";
 import { Badge } from "../components/ui/badge";
 import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
-import { listUserLinks } from "../../workers/db/queries";
+import { listUserLinks, getPublicPlatformStats } from "../../workers/db/queries";
 import { claimLocalHistory } from "../lib/local-history";
 
 export function meta({}: Route.MetaArgs) {
@@ -25,12 +27,25 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request, context }: Route.LoaderArgs) {
   let user: NavbarUser | null = null;
   let recentLinks: RecentLinkItem[] = [];
+  let platformStats: PlatformStats = {
+    totalClicks: 0,
+    totalLinks: 0,
+    trend: [],
+  };
 
   try {
+    const cf = context.get(cloudflareContext);
+    if (cf?.env?.SHORTENER_DB) {
+      try {
+        platformStats = await getPublicPlatformStats(cf.env.SHORTENER_DB);
+      } catch {
+        // Fallback default
+      }
+    }
+
     const cookieHeader = request.headers.get("Cookie") || "";
     const match = cookieHeader.match(/(?:^|;\s*)auth_session=([^;]+)/);
     if (match) {
-      const cf = context.get(cloudflareContext);
       const secret = cf?.env?.JWT_SECRET;
       if (secret) {
         user = await verifySessionJwt(match[1], secret);
@@ -56,12 +71,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // If context unavailable or JWT invalid, default to null
   }
 
-  return { user, recentLinks };
+  return { user, recentLinks, platformStats };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user ?? null;
   const initialRecent = loaderData?.recentLinks ?? [];
+  const initialStats = loaderData?.platformStats;
   const [recentLinks, setRecentLinks] = React.useState<RecentLinkItem[]>(initialRecent);
 
   // Sync state if loader data changes
@@ -95,12 +111,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#262626] flex flex-col justify-between">
+    <div className="relative min-h-screen bg-transparent text-[#262626] flex flex-col justify-between overflow-x-hidden">
+      <AnimatedBackground />
       <Navbar user={user} />
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative mx-auto max-w-6xl px-4 pt-12 pb-16 sm:px-6 sm:pt-20 sm:pb-24">
+        <section className="relative mx-auto max-w-6xl px-4 pt-12 pb-8 sm:px-6 sm:pt-20 sm:pb-12">
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
             {/* Pill chip badge */}
             <motion.div
@@ -149,6 +166,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             {/* Recent Links (Local History or User Synced) */}
             <RecentLinks user={user} serverLinks={recentLinks} />
+
+            {/* Real-time Edge Activity & Line Chart */}
+            <LiveStatsChart initialStats={initialStats} />
           </div>
         </section>
 

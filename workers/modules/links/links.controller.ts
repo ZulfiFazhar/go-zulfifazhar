@@ -2,7 +2,13 @@ import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import type { AppEnv } from "../../context";
 import { createShortLink } from "./links.service";
-import { listUserLinks, deleteUserLink, claimAnonymousLinks, type LinkRecord } from "../../db/queries";
+import {
+  listUserLinks,
+  deleteUserLink,
+  claimAnonymousLinks,
+  getPublicPlatformStats,
+  type LinkRecord,
+} from "../../db/queries";
 import { authMiddleware, requireAuth } from "../auth/auth.middleware";
 import { verifySessionJwt } from "../auth/auth.service";
 
@@ -160,8 +166,20 @@ export async function handleClaimLinks(c: Context<AppEnv>) {
   }
 }
 
+export async function handleGetPublicStats(c: Context<AppEnv>) {
+  try {
+    const stats = await getPublicPlatformStats(c.env.SHORTENER_DB);
+    return c.json(stats, 200, {
+      "Cache-Control": "public, max-age=5, s-maxage=5",
+    });
+  } catch (err: any) {
+    return c.json({ error: err?.message || "Failed to load public stats" }, 500);
+  }
+}
+
 export const linksRoutes = new Hono<AppEnv>();
 linksRoutes.use("*", authMiddleware);
+linksRoutes.get("/stats/public", handleGetPublicStats);
 linksRoutes.post("/", handleCreateLink);
 linksRoutes.post("/links", handleCreateLink);
 linksRoutes.post("/claim", requireAuth, handleClaimLinks);

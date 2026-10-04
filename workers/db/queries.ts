@@ -202,3 +202,54 @@ export async function findUserByEmail(
     .first<UserRecord>();
   return user ?? null;
 }
+
+export interface PublicTrendPoint {
+  timestamp: number;
+  label: string;
+  clicks: number;
+}
+
+export interface PublicStats {
+  totalClicks: number;
+  totalLinks: number;
+  trend: PublicTrendPoint[];
+}
+
+export async function getPublicPlatformStats(db: D1Database): Promise<PublicStats> {
+  const totalsRes = await db
+    .prepare("SELECT COUNT(*) as total_links, COALESCE(SUM(clicks), 0) as total_clicks FROM links")
+    .first<{ total_links: number; total_clicks: number }>();
+
+  const totalLinks = totalsRes?.total_links ?? 0;
+  const totalClicks = totalsRes?.total_clicks ?? 0;
+
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+  const clicksRes = await db
+    .prepare("SELECT timestamp FROM link_clicks WHERE timestamp >= ? ORDER BY timestamp ASC")
+    .bind(oneDayAgo)
+    .all<{ timestamp: number }>();
+
+  const timestamps = (clicksRes.results || []).map((r) => r.timestamp);
+
+  // 8 slots covering 24h (3-hour intervals)
+  const slotCount = 8;
+  const slotDuration = (24 * 60 * 60 * 1000) / slotCount;
+  const trend: PublicTrendPoint[] = [];
+
+  for (let i = 0; i < slotCount; i++) {
+    const slotStart = oneDayAgo + i * slotDuration;
+    const slotEnd = slotStart + slotDuration;
+    const count = timestamps.filter((ts) => ts >= slotStart && ts < slotEnd).length;
+    const date = new Date(slotEnd);
+    const label = `${date.getUTCHours().toString().padStart(2, "0")}:00`;
+    trend.push({ timestamp: slotEnd, label, clicks: count });
+  }
+
+  return {
+    totalClicks,
+    totalLinks,
+    trend,
+  };
+}

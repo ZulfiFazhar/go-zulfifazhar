@@ -3,12 +3,13 @@ import { createRequestHandler, RouterContextProvider } from "react-router";
 import { cloudflareContext } from "../app/context";
 import type { AppEnv } from "./context";
 import { authRoutes } from "./modules/auth/auth.controller";
-import { linksRoutes, userLinksRoutes } from "./modules/links/links.controller";
+import { linksRoutes, userLinksRoutes, handleGetPublicStats } from "./modules/links/links.controller";
 import { handleEdgeRedirect } from "./modules/redirect/redirect.controller";
 
 const app = new Hono<AppEnv>();
 
 // API modular routes
+app.get("/api/stats/public", handleGetPublicStats);
 app.route("/api/auth", authRoutes);
 app.route("/api/links", linksRoutes);
 app.route("/api/user/links", userLinksRoutes);
