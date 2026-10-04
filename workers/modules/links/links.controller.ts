@@ -45,11 +45,16 @@ export async function handleCreateLink(c: Context<AppEnv>) {
     return c.json({ error: "Custom slug requires authentication" }, 403);
   }
 
+  const rawExpiresIn = body?.expiresIn ?? body?.expires_in;
+  const expiresIn =
+    typeof rawExpiresIn === "number" && rawExpiresIn > 0 ? rawExpiresIn : undefined;
+
   try {
     const result = await createShortLink(c.env, {
       url: rawUrl,
       customSlug: user ? customSlug : undefined,
       userId: user?.userId,
+      expiresIn,
     });
 
     return c.json(
@@ -58,6 +63,7 @@ export async function handleCreateLink(c: Context<AppEnv>) {
         slug: result.slug,
         targetUrl: result.targetUrl,
         shortUrl: result.shortUrl,
+        expiresAt: result.expiresAt,
       },
       201
     );

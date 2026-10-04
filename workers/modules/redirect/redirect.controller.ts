@@ -7,6 +7,7 @@ export interface CachedLink {
   id: string;
   targetUrl?: string;
   target_url?: string;
+  expiresAt?: number | null;
 }
 
 interface ExecutionContextLike {
@@ -108,6 +109,10 @@ export async function handleEdgeRedirect(
 
       const targetUrl = cached?.targetUrl || cached?.target_url;
       if (cached && targetUrl) {
+        if (typeof cached.expiresAt === "number" && cached.expiresAt < Date.now()) {
+          return c.text("This shortlink has expired.", 410);
+        }
+
         if (cached.id && ctx?.waitUntil) {
           ctx.waitUntil(
             recordClick(c, cached.id).catch((err) => {
@@ -129,12 +134,26 @@ export async function handleEdgeRedirect(
     return null;
   }
 
+  if (typeof record.expires_at === "number" && record.expires_at < Date.now()) {
+    return c.text("This shortlink has expired.", 410);
+  }
+
   // 3. Backfill KV cache & track click in background
   if (c.env.SHORTENER_CACHE) {
     try {
+      const ttl =
+        typeof record.expires_at === "number"
+          ? Math.max(Math.floor((record.expires_at - Date.now()) / 1000), 60)
+          : undefined;
+
       await c.env.SHORTENER_CACHE.put(
         cacheKey,
-        JSON.stringify({ id: record.id, targetUrl: record.target_url })
+        JSON.stringify({
+          id: record.id,
+          targetUrl: record.target_url,
+          expiresAt: record.expires_at,
+        }),
+        ttl ? { expirationTtl: ttl } : undefined
       );
     } catch (err) {
       console.error("Failed to populate KV cache:", err);

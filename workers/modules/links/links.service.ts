@@ -17,6 +17,7 @@ export interface CreateShortLinkInput {
   url: string;
   customSlug?: string;
   userId?: string;
+  expiresIn?: number;
 }
 
 export interface ShortLinkResult {
@@ -28,6 +29,8 @@ export interface ShortLinkResult {
   userId: string | null;
   user_id: string | null;
   clicks: number;
+  expiresAt?: number | null;
+  expires_at?: number | null;
   createdAt: number;
   created_at: number;
 }
@@ -99,16 +102,28 @@ export async function createShortLink(
     }
   }
 
+  const expires_at =
+    typeof input.expiresIn === "number" && input.expiresIn > 0
+      ? Date.now() + input.expiresIn * 1000
+      : null;
+
   const record = await createLinkRecord(env.SHORTENER_DB, {
     slug,
     target_url: targetUrl,
     user_id: input.userId || null,
+    expires_at,
   });
 
   if (env.SHORTENER_CACHE) {
+    const kvOptions =
+      typeof input.expiresIn === "number" && input.expiresIn > 0
+        ? { expirationTtl: Math.max(input.expiresIn, 60) }
+        : undefined;
+
     await env.SHORTENER_CACHE.put(
       `slug:${record.slug}`,
-      JSON.stringify({ id: record.id, targetUrl: record.target_url })
+      JSON.stringify({ id: record.id, targetUrl: record.target_url, expiresAt: expires_at }),
+      kvOptions
     );
   }
 
@@ -124,6 +139,8 @@ export async function createShortLink(
     userId: record.user_id,
     user_id: record.user_id,
     clicks: record.clicks,
+    expiresAt: record.expires_at,
+    expires_at: record.expires_at,
     createdAt: record.created_at,
     created_at: record.created_at,
   };

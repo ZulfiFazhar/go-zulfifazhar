@@ -1,8 +1,47 @@
 import { describe, it, expect, mock } from "bun:test";
 import app from "../workers/app";
-import { getPublicPlatformStats, getUserClickTrend } from "../workers/db/queries";
+import {
+  getPublicPlatformStats,
+  getUserClickTrend,
+  getUserGeoAndDeviceAnalytics,
+} from "../workers/db/queries";
 
 describe("Public Platform Stats", () => {
+  it("calculates geo and device analytics breakdown", async () => {
+    const mockDb = {
+      prepare: mock((query: string) => {
+        const stmt = {
+          bind: mock(() => stmt),
+          all: mock(async () => {
+            if (query.includes("GROUP BY country")) {
+              return { results: [{ country: "ID", count: 8 }, { country: "US", count: 2 }] };
+            }
+            if (query.includes("GROUP BY referrer")) {
+              return { results: [{ referrer: "https://twitter.com/feed", count: 5 }] };
+            }
+            if (query.includes("SELECT lc.user_agent")) {
+              return {
+                results: [
+                  { user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
+                  { user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+                ],
+              };
+            }
+            return { results: [] };
+          }),
+        };
+        return stmt;
+      }),
+    } as unknown as D1Database;
+
+    const data = await getUserGeoAndDeviceAnalytics(mockDb, "user_1");
+    expect(data.countries.length).toBe(2);
+    expect(data.countries[0].name).toBe("ID");
+    expect(data.countries[0].percentage).toBe(80);
+    expect(data.referrers[0].name).toBe("twitter.com");
+    expect(data.devices.find((d) => d.name === "Mobile")?.count).toBe(1);
+    expect(data.devices.find((d) => d.name === "Desktop")?.count).toBe(1);
+  });
   it("calculates user 24h click trend", async () => {
     const now = Date.now();
     const mockDb = {

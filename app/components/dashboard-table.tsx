@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Copy, Check, Trash2, ExternalLink, Inbox, Loader2 } from "lucide-react";
+import { Copy, Check, Trash2, ExternalLink, Inbox, Loader2, QrCode } from "lucide-react";
 import {
   Table,
   TableHeader,
@@ -10,6 +10,7 @@ import {
 } from "./ui/table";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { QrModal } from "./qr-modal";
 
 export interface DashboardLinkItem {
   id: string;
@@ -17,6 +18,7 @@ export interface DashboardLinkItem {
   targetUrl: string;
   shortUrl: string;
   clicks: number;
+  expiresAt?: number | null;
   createdAt: number;
 }
 
@@ -43,6 +45,7 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
   const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [qrUrl, setQrUrl] = React.useState<string | null>(null);
   const copyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
@@ -176,14 +179,39 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
                       </Badge>
                     </TableCell>
 
-                    {/* Created Date */}
+                    {/* Created Date & Expiry */}
                     <TableCell className="text-xs text-neutral-500 whitespace-nowrap">
-                      {formatDate(link.createdAt)}
+                      <div>{formatDate(link.createdAt)}</div>
+                      {link.expiresAt && (
+                        <div className="mt-0.5">
+                          {link.expiresAt < Date.now() ? (
+                            <span className="inline-block rounded-full bg-red-50 px-1.5 py-0.2 text-[9px] font-medium text-red-600">
+                              Expired
+                            </span>
+                          ) : (
+                            <span className="inline-block rounded-full bg-neutral-100 px-1.5 py-0.2 text-[9px] font-mono text-neutral-500">
+                              Exp: {formatDate(link.expiresAt)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
 
                     {/* Actions */}
                     <TableCell className="text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* QR Code button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setQrUrl(link.shortUrl)}
+                          className="h-8 w-8 rounded-full p-0 text-neutral-400 hover:bg-[#ffefe8] hover:text-[#ff5e1f] transition-colors"
+                          title="View QR Code"
+                          aria-label={`QR Code for ${link.slug}`}
+                        >
+                          <QrCode className="h-3.5 w-3.5" />
+                        </Button>
+
                         {/* Copy button */}
                         <Button
                           variant={isCopied ? "default" : "outline"}
@@ -255,6 +283,13 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* QR Code Modal */}
+      <QrModal
+        isOpen={Boolean(qrUrl)}
+        onClose={() => setQrUrl(null)}
+        shortUrl={qrUrl || ""}
+      />
     </div>
   );
 }

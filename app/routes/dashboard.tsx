@@ -12,10 +12,17 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../co
 import { Badge } from "../components/ui/badge";
 import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
-import { listUserLinks, getUserClickTrend, type PublicTrendPoint } from "../../workers/db/queries";
+import {
+  listUserLinks,
+  getUserClickTrend,
+  getUserGeoAndDeviceAnalytics,
+  type PublicTrendPoint,
+  type GeoAndDeviceAnalytics,
+} from "../../workers/db/queries";
 import { Link2, BarChart3, TrendingUp, PlusCircle } from "lucide-react";
 import { claimLocalHistory } from "../lib/local-history";
 import { LineChart } from "../components/line-chart";
+import { GeoDeviceCard } from "../components/geo-device-card";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -51,6 +58,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   let links: DashboardLinkItem[] = [];
   let trend: PublicTrendPoint[] = [];
+  let analytics: GeoAndDeviceAnalytics = {
+    countries: [],
+    devices: [],
+    referrers: [],
+    totalClicks: 0,
+  };
+
   try {
     const cf = context.get(cloudflareContext);
     if (cf?.env?.SHORTENER_DB) {
@@ -65,22 +79,35 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         targetUrl: record.target_url,
         shortUrl: `${base}/${record.slug}`,
         clicks: record.clicks,
+        expiresAt: record.expires_at,
         createdAt: record.created_at,
       }));
 
-      trend = await getUserClickTrend(cf.env.SHORTENER_DB, user.userId);
+      const [trendData, analyticsData] = await Promise.all([
+        getUserClickTrend(cf.env.SHORTENER_DB, user.userId),
+        getUserGeoAndDeviceAnalytics(cf.env.SHORTENER_DB, user.userId),
+      ]);
+
+      trend = trendData;
+      analytics = analyticsData;
     }
   } catch {
     // If database query fails, fallback to empty array
   }
 
-  return { user, links, trend };
+  return { user, links, trend, analytics };
 }
 
 export default function Dashboard({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user;
   const initialLinks = loaderData?.links ?? [];
   const trend = loaderData?.trend ?? [];
+  const analytics = loaderData?.analytics ?? {
+    countries: [],
+    devices: [],
+    referrers: [],
+    totalClicks: 0,
+  };
   const [links, setLinks] = React.useState<DashboardLinkItem[]>(initialLinks);
 
   // Sync state when loaderData changes
@@ -113,6 +140,7 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
       targetUrl: newResult.targetUrl,
       shortUrl: newResult.shortUrl,
       clicks: 0,
+      expiresAt: newResult.expiresAt,
       createdAt: Date.now(),
     };
     setLinks((prev) => [newLink, ...prev.filter((l) => l.id !== newLink.id)]);
@@ -240,6 +268,9 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
 
           {/* 24-Hour Click Traffic Line Chart */}
           <LineChart data={trend} />
+
+          {/* Geo, Device, and Referrer Breakdown */}
+          <GeoDeviceCard analytics={analytics} />
 
           {/* Shorten Section */}
           <Card className="mb-8 p-6 border-[#f0f0f0] shadow-xs">

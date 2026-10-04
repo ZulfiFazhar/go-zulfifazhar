@@ -381,4 +381,49 @@ describe("Edge Redirection Handler", () => {
     expect(missRes.status).toBe(404);
     expect(await missRes.text()).toBe("Fallback to React Router");
   });
+
+  it("returns 410 Gone for expired links from KV or D1", async () => {
+    const expiredTime = Date.now() - 5000;
+    const { env } = createMockEnv(
+      {
+        "slug:expired-kv": {
+          id: "link-exp-kv",
+          targetUrl: "https://example.com/expired",
+          expiresAt: expiredTime,
+        },
+      },
+      {
+        "expired-db": {
+          id: "link-exp-db",
+          slug: "expired-db",
+          target_url: "https://example.com/expired-db",
+          expires_at: expiredTime,
+        },
+      }
+    );
+
+    // Test KV expired hit
+    const mockCtxKv = {
+      req: {
+        param: (k: string) => (k === "slug" ? "expired-kv" : undefined),
+        header: () => null,
+      },
+      env,
+      text: (msg: string, status: number) => new Response(msg, { status }),
+    } as any;
+    const resKv = await handleEdgeRedirect(mockCtxKv);
+    expect(resKv?.status).toBe(410);
+
+    // Test D1 expired hit
+    const mockCtxDb = {
+      req: {
+        param: (k: string) => (k === "slug" ? "expired-db" : undefined),
+        header: () => null,
+      },
+      env,
+      text: (msg: string, status: number) => new Response(msg, { status }),
+    } as any;
+    const resDb = await handleEdgeRedirect(mockCtxDb);
+    expect(resDb?.status).toBe(410);
+  });
 });

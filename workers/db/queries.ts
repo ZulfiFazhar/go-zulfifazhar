@@ -20,6 +20,7 @@ export interface LinkRecord {
   target_url: string;
   user_id: string | null;
   clicks: number;
+  expires_at?: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -30,6 +31,7 @@ export interface LinkInsert {
   target_url: string;
   user_id?: string | null;
   clicks?: number;
+  expires_at?: number | null;
   created_at?: number;
   updated_at?: number;
 }
@@ -60,12 +62,13 @@ export async function createLinkRecord(
   const updated_at = data.updated_at ?? now;
   const clicks = data.clicks ?? 0;
   const user_id = data.user_id ?? null;
+  const expires_at = data.expires_at ?? null;
 
   await db
     .prepare(
-      "INSERT INTO links (id, slug, target_url, user_id, clicks, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO links (id, slug, target_url, user_id, clicks, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .bind(id, data.slug, data.target_url, user_id, clicks, created_at, updated_at)
+    .bind(id, data.slug, data.target_url, user_id, clicks, expires_at, created_at, updated_at)
     .run();
 
   return {
@@ -74,6 +77,7 @@ export async function createLinkRecord(
     target_url: data.target_url,
     user_id,
     clicks,
+    expires_at,
     created_at,
     updated_at,
   };
@@ -288,4 +292,131 @@ export async function getUserClickTrend(
   }
 
   return trend;
+}
+
+export interface MetricStatItem {
+  name: string;
+  count: number;
+  percentage: number;
+}
+
+export interface GeoAndDeviceAnalytics {
+  countries: MetricStatItem[];
+  devices: MetricStatItem[];
+  referrers: MetricStatItem[];
+  totalClicks: number;
+}
+
+export async function getUserGeoAndDeviceAnalytics(
+  db: D1Database,
+  userId: string
+): Promise<GeoAndDeviceAnalytics> {
+  const [countriesRes, referrersRes, uaRes] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COALESCE(NULLIF(lc.country, ''), 'Unknown') as country, COUNT(*) as count
+         FROM link_clicks lc
+         JOIN links l ON lc.link_id = l.id
+         WHERE l.user_id = ?
+         GROUP BY country
+         ORDER BY count DESC
+         LIMIT 5`
+      )
+      .bind(userId)
+      .all<{ country: string; count: number }>(),
+
+    db
+      .prepare(
+        `SELECT COALESCE(NULLIF(lc.referrer, ''), 'Direct') as referrer, COUNT(*) as count
+         FROM link_clicks lc
+         JOIN links l ON lc.link_id = l.id
+         WHERE l.user_id = ?
+         GROUP BY referrer
+         ORDER BY count DESC
+         LIMIT 5`
+      )
+      .bind(userId)
+      .all<{ referrer: string; count: number }>(),
+
+    db
+      .prepare(
+        `SELECT lc.user_agent
+         FROM link_clicks lc
+         JOIN links l ON lc.link_id = l.id
+         WHERE l.user_id = ?
+         LIMIT 500`
+      )
+      .bind(userId)
+      .all<{ user_agent: string | null }>(),
+  ]);
+
+  const rawCountries = countriesRes.results || [];
+  const rawReferrers = referrersRes.results || [];
+  const rawUas = uaRes.results || [];
+
+  const totalClicks = rawUas.length;
+
+  // Compute countries
+  const totalCountryCount = rawCountries.reduce((sum, c) => sum + c.count, 0);
+  const countries: MetricStatItem[] = rawCountries.map((c) => ({
+    name: c.country,
+    count: c.count,
+    percentage: totalCountryCount > 0 ? Math.round((c.count / totalCountryCount) * 100) : 0,
+  }));
+
+  // Compute referrers
+  const totalReferrerCount = rawReferrers.reduce((sum, r) => sum + r.count, 0);
+  const referrers: MetricStatItem[] = rawReferrers.map((r) => {
+    let cleanName = r.referrer;
+    try {
+      if (cleanName.startsWith("http")) {
+        const u = new URL(cleanName);
+        cleanName = u.hostname.replace(/^www\./, "");
+      }
+    } catch {}
+    return {
+      name: cleanName,
+      count: r.count,
+      percentage: totalReferrerCount > 0 ? Math.round((r.count / totalReferrerCount) * 100) : 0,
+    };
+  });
+
+  // Classify devices
+  let mobile = 0;
+  let desktop = 0;
+  let tablet = 0;
+  let bot = 0;
+
+  for (const u of rawUas) {
+    const ua = u.user_agent || "";
+    if (/bot|crawl|spider|slurp/i.test(ua)) {
+      bot++;
+    } else if (/ipad|tablet/i.test(ua)) {
+      tablet++;
+    } else if (/mobile|iphone|android|blackberry/i.test(ua)) {
+      mobile++;
+    } else {
+      desktop++;
+    }
+  }
+
+  const deviceList = [
+    { name: "Desktop", count: desktop },
+    { name: "Mobile", count: mobile },
+    { name: "Tablet", count: tablet },
+    { name: "Bot / Crawler", count: bot },
+  ].filter((d) => d.count > 0);
+
+  const devices: MetricStatItem[] = deviceList.map((d) => ({
+    name: d.name,
+    count: d.count,
+    percentage: totalClicks > 0 ? Math.round((d.count / totalClicks) * 100) : 0,
+  }));
+
+  return {
+    countries,
+    devices,
+    referrers,
+    totalClicks,
+  };
 }

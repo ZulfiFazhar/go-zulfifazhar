@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS links (
   target_url TEXT NOT NULL,
   user_id TEXT,
   clicks INTEGER DEFAULT 0,
+  expires_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

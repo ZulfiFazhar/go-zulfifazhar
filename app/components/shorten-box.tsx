@@ -1,15 +1,17 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Check, ExternalLink, Loader2, ArrowRight, AlertCircle, RotateCcw } from "lucide-react";
+import { Copy, Check, ExternalLink, Loader2, ArrowRight, AlertCircle, RotateCcw, QrCode, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { addLocalHistory } from "../lib/local-history";
+import { QrModal } from "./qr-modal";
 
 export interface ShortenResult {
   id: string;
   slug: string;
   targetUrl: string;
   shortUrl: string;
+  expiresAt?: number | null;
 }
 
 export interface ShortenBoxProps {
@@ -30,6 +32,8 @@ export function ShortenBox({
   const [url, setUrl] = React.useState("");
   const [customSlug, setCustomSlug] = React.useState("");
   const [showCustomSlug, setShowCustomSlug] = React.useState(defaultCustomSlugOpen);
+  const [expiresIn, setExpiresIn] = React.useState<number>(0);
+  const [showQr, setShowQr] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(initialError);
   const [result, setResult] = React.useState<ShortenResult | null>(initialResult);
@@ -102,6 +106,7 @@ export function ShortenBox({
         body: JSON.stringify({
           url: trimmedUrl,
           customSlug: trimmedSlug || undefined,
+          expiresIn: expiresIn > 0 ? expiresIn : undefined,
         }),
       });
 
@@ -126,6 +131,7 @@ export function ShortenBox({
         slug: data.slug,
         targetUrl: data.targetUrl || trimmedUrl,
         shortUrl: displayShortUrl,
+        expiresAt: data.expiresAt,
       };
 
       if (!user) {
@@ -178,24 +184,36 @@ export function ShortenBox({
                 <ExternalLink className="h-4 w-4 shrink-0 text-neutral-400 group-hover:text-[#ff5e1f]" />
               </a>
 
-              <Button
-                onClick={handleCopy}
-                variant={copied ? "default" : "secondary"}
-                size="sm"
-                className="h-10 shrink-0 gap-2 px-5 font-medium transition-all"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowQr(true)}
+                  variant="outline"
+                  size="sm"
+                  className="h-10 shrink-0 gap-1.5 rounded-full border-[#f0f0f0] bg-white px-3.5 text-xs font-medium text-neutral-600 hover:text-[#262626] hover:bg-[#fafafa]"
+                >
+                  <QrCode className="h-4 w-4 text-[#ff5e1f]" />
+                  <span>QR Code</span>
+                </Button>
+
+                <Button
+                  onClick={handleCopy}
+                  variant={copied ? "default" : "secondary"}
+                  size="sm"
+                  className="h-10 shrink-0 gap-2 px-5 font-medium transition-all"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             <p className="mt-3 truncate text-xs text-neutral-500">
@@ -246,36 +264,56 @@ export function ShortenBox({
               </Button>
             </div>
 
-            {/* Custom Slug section */}
-            <div className="flex flex-col gap-1.5 px-2">
-              {!showCustomSlug ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCustomSlug(true)}
-                  className="self-start text-xs font-medium text-neutral-500 hover:text-[#ff5e1f] transition-colors"
-                >
-                  + Add custom alias (optional)
-                </button>
-              ) : (
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
-                  <div className="flex h-9 items-center rounded-full border border-[#f0f0f0] bg-white px-3 text-xs text-neutral-500 shadow-xs">
-                    <span className="font-mono text-neutral-400">go.zulfifazhar.dev/</span>
-                    <input
-                      type="text"
-                      value={customSlug}
-                      onChange={(e) => setCustomSlug(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
-                      placeholder="custom-slug"
-                      disabled={isLoading}
-                      className="ml-1 bg-transparent font-mono text-xs text-[#262626] outline-none placeholder:text-neutral-300 w-32"
-                    />
+            {/* Options row: Custom Slug & Expiration */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-2">
+              <div>
+                {!showCustomSlug ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomSlug(true)}
+                    className="self-start text-xs font-medium text-neutral-500 hover:text-[#ff5e1f] transition-colors"
+                  >
+                    + Add custom alias (optional)
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
+                    <div className="flex h-9 items-center rounded-full border border-[#f0f0f0] bg-white px-3 text-xs text-neutral-500 shadow-xs">
+                      <span className="font-mono text-neutral-400">go.zulfifazhar.dev/</span>
+                      <input
+                        type="text"
+                        value={customSlug}
+                        onChange={(e) => setCustomSlug(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
+                        placeholder="custom-slug"
+                        disabled={isLoading}
+                        className="ml-1 bg-transparent font-mono text-xs text-[#262626] outline-none placeholder:text-neutral-300 w-32"
+                      />
+                    </div>
+                    {!user && (
+                      <span className="text-[11px] text-neutral-400 sm:ml-2">
+                        (Requires <a href="/api/auth/google" className="underline hover:text-[#ff5e1f]">Google sign-in</a>)
+                      </span>
+                    )}
                   </div>
-                  {!user && (
-                    <span className="text-[11px] text-neutral-400 sm:ml-2">
-                      (Requires <a href="/api/auth/google" className="underline hover:text-[#ff5e1f]">Google sign-in</a>)
-                    </span>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+
+              {/* Expiry Selector */}
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                <Clock className="h-3.5 w-3.5 text-[#ff5e1f]" />
+                <span className="text-[11px]">Expires:</span>
+                <select
+                  value={expiresIn}
+                  onChange={(e) => setExpiresIn(Number(e.target.value))}
+                  disabled={isLoading}
+                  className="rounded-full border border-[#f0f0f0] bg-white px-2.5 py-1 text-xs font-medium text-[#262626] shadow-2xs outline-none focus:border-[#ff5e1f] cursor-pointer"
+                >
+                  <option value={0}>Never (Permanent)</option>
+                  <option value={3600}>1 Hour</option>
+                  <option value={86400}>24 Hours</option>
+                  <option value={604800}>7 Days</option>
+                  <option value={2592000}>30 Days</option>
+                </select>
+              </div>
             </div>
 
             {error && (
@@ -291,6 +329,13 @@ export function ShortenBox({
           </motion.form>
         )}
       </AnimatePresence>
+
+      {/* QR Code Modal Dialog */}
+      <QrModal
+        isOpen={showQr}
+        onClose={() => setShowQr(false)}
+        shortUrl={result?.shortUrl || ""}
+      />
     </div>
   );
 }
