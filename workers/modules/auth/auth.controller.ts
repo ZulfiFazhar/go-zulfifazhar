@@ -93,7 +93,7 @@ export async function handleGoogleCallback(c: Context<AppEnv>) {
       secure: c.req.url.startsWith("https://"),
       sameSite: "Lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 30 * 24 * 60 * 60, // 30 days
     });
 
     return c.redirect("/dashboard");

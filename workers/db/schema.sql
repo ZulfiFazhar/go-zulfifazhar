@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS link_clicks (
   FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_links_slug ON links(slug);
 CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id);
 CREATE INDEX IF NOT EXISTS idx_clicks_link ON link_clicks(link_id);
+CREATE INDEX IF NOT EXISTS idx_clicks_link_ts ON link_clicks(link_id, timestamp DESC);

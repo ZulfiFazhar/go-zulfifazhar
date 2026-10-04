@@ -22,7 +22,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   try {
     const cookieHeader = request.headers.get("Cookie") || "";
-    const match = cookieHeader.match(/auth_session=([^;]+)/);
+    const match = cookieHeader.match(/(?:^|;\s*)auth_session=([^;]+)/);
     if (match) {
       const cf = context.get(cloudflareContext);
       const secret = cf?.env?.JWT_SECRET;

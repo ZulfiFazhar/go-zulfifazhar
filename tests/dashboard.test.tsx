@@ -169,6 +169,33 @@ describe("Dashboard Page & Table (Task 8 Implementation)", () => {
       expect(data.links[1].slug).toBe("docs");
       expect(data.links[1].clicks).toBe(10);
     });
+
+    it("parses auth_session cookie correctly without colliding with prefix or multiple cookies", async () => {
+      const validToken = await signSessionJwt(
+        {
+          userId: "user-42",
+          email: "zulfi@cloudflare.com",
+          name: "Zulfi Fazhar",
+        },
+        secret
+      );
+
+      const request = new Request("https://go.zulfifazhar.dev/dashboard", {
+        headers: {
+          Cookie: `not_auth_session=dummy; other=val; auth_session=${validToken}; foo=bar`,
+        },
+      });
+      const context = createMockContext();
+
+      const data = (await loader({
+        request,
+        context: context as any,
+        params: {},
+      } as any)) as { user: any; links: DashboardLinkItem[] };
+
+      expect(data).toHaveProperty("user");
+      expect(data.user.userId).toBe("user-42");
+    });
   });
 
   describe("Dashboard Component UI Rendering", () => {

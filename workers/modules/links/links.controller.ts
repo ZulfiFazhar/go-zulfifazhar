@@ -63,7 +63,10 @@ export async function handleCreateLink(c: Context<AppEnv>) {
     ) {
       return c.json({ error: message }, 400);
     }
-    if (message === "Slug already in use") {
+    if (
+      message.includes("Slug already in use") ||
+      message.includes("UNIQUE constraint failed")
+    ) {
       return c.json({ error: message }, 409);
     }
     return c.json({ error: message }, 500);

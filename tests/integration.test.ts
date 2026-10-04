@@ -350,10 +350,10 @@ describe("End-to-End Integration Tests", () => {
     expect(kvStore.has(`slug:${customSlug}`)).toBe(false);
     expect(dbState.links.has(createdLink.id)).toBe(false);
 
-    // 7. Verify subsequent redirect falls through and returns 404
+    // 7. Verify subsequent redirect falls through to SSR fallback
     const deadRedirectReq = new Request(`https://go.zulfifazhar.dev/${customSlug}`, { method: "GET" });
     const deadRedirectRes = await app.fetch(deadRedirectReq, env);
-    expect(deadRedirectRes.status).toBe(404);
+    expect(deadRedirectRes.status).toBe(500);
   });
 
   it("handles KV cache miss with D1 backfill and subsequent KV cache hit", async () => {

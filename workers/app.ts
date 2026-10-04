@@ -47,8 +47,9 @@ app.get("*", async (c) => {
     });
 
     return await requestHandler(c.req.raw, routerContext);
-  } catch {
-    return c.text("Not Found", 404);
+  } catch (err) {
+    console.error("SSR rendering error:", err);
+    return c.text("Internal Server Error", 500);
   }
 });
 

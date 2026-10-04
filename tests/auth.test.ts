@@ -95,6 +95,31 @@ describe("Auth Session JWT", () => {
     expect(verified).toBeNull();
   });
 
+  it("rejects token missing exp claim", async () => {
+    // Manually sign a token without exp
+    const enc = new TextEncoder();
+    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const payload = btoa(JSON.stringify({ userId: "u_no_exp", email: "noexp@example.com" }))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const dataToSign = `${header}.${payload}`;
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, enc.encode(dataToSign));
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const token = `${dataToSign}.${signatureB64}`;
+
+    const verified = await verifySessionJwt(token, secret);
+    expect(verified).toBeNull();
+  });
+
   it("rejects expired token", async () => {
     const payload: UserSession = { userId: "user_1", email: "test@example.com" };
     // Expires immediately (-1 second)
@@ -382,6 +407,7 @@ describe("Auth Controller Sub-app", () => {
 
     const setCookie = res.headers.get("set-cookie");
     expect(setCookie).toContain("auth_session=");
+    expect(setCookie).toContain("Max-Age=2592000");
 
     // Verify session token inside cookie
     const match = setCookie?.match(/auth_session=([^;]+)/);

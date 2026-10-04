@@ -55,8 +55,8 @@ function getCryptoKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
   );
 }
 
-// ponytail: default 7-day session lifetime; upgrade to configurable or rolling TTL when refresh tokens needed
-const DEFAULT_EXPIRATION_SECONDS = 7 * 24 * 60 * 60;
+// ponytail: default 30-day session lifetime; upgrade to configurable or rolling TTL when refresh tokens needed
+const DEFAULT_EXPIRATION_SECONDS = 30 * 24 * 60 * 60;
 
 export async function signSessionJwt(
   payload: UserSession,
@@ -112,11 +112,8 @@ export async function verifySessionJwt(
     const payloadJson = new TextDecoder().decode(base64UrlToBytes(payloadB64));
     const claims = JSON.parse(payloadJson);
 
-    if (claims.exp && typeof claims.exp === "number") {
-      const now = Math.floor(Date.now() / 1000);
-      if (now > claims.exp) {
-        return null;
-      }
+    if (!claims.exp || typeof claims.exp !== "number" || Math.floor(Date.now() / 1000) > claims.exp) {
+      return null;
     }
 
     if (!claims.userId || typeof claims.userId !== "string" || !claims.email || typeof claims.email !== "string") {

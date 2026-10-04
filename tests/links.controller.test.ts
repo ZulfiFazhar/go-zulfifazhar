@@ -315,6 +315,46 @@ describe("Links API Controller & Routes", () => {
       const data: any = await res.json();
       expect(data.error).toBe("Slug already in use");
     });
+
+    it("returns 409 Conflict when database throws UNIQUE constraint failed", async () => {
+      const { env, mockDb } = createTestEnv();
+      const token = await signSessionJwt(userA, env.JWT_SECRET);
+
+      (mockDb.prepare as any) = mock((query: string) => {
+        const stmt = {
+          bind: mock(() => stmt),
+          first: mock(async () => null),
+          all: mock(async () => ({ success: true, results: [] })),
+          run: mock(async () => {
+            if (query.includes("INSERT INTO links")) {
+              throw new Error("D1_ERROR: UNIQUE constraint failed: links.slug");
+            }
+            return { success: true, meta: { changes: 1 } };
+          }),
+        };
+        return stmt;
+      });
+
+      const res = await app.request(
+        "https://go.zulfifazhar.dev/api/links",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: `auth_session=${token}`,
+          },
+          body: JSON.stringify({
+            url: "https://example.com/race",
+            customSlug: "race-slug",
+          }),
+        },
+        env
+      );
+
+      expect(res.status).toBe(409);
+      const data: any = await res.json();
+      expect(data.error).toContain("UNIQUE constraint failed");
+    });
   });
 
   describe("GET /api/user/links", () => {
@@ -548,9 +588,9 @@ describe("Links API Controller & Routes", () => {
         env
       );
 
-      // In bun test without virtual:react-router build, the fallback catches and returns 404
-      expect(res.status).toBe(404);
-      expect(await res.text()).toBe("Not Found");
+      // In bun test without virtual:react-router build, the fallback catches and returns 500
+      expect(res.status).toBe(500);
+      expect(await res.text()).toBe("Internal Server Error");
     });
   });
 });
