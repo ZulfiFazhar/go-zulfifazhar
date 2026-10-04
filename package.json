@@ -3,6 +3,7 @@
   "description": "A modern full-stack template powered by Cloudflare Workers, using Hono for backend APIs, React Router for frontend routing, and shadcn/ui for beautiful, accessible components styled with Tailwind CSS",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.2",
   "cloudflare": {
     "label": "React Router + Hono Fullstack App",
     "products": [
