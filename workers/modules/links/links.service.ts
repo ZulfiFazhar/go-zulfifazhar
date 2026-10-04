@@ -92,12 +92,10 @@ export async function createShortLink(
     slug = generateRandomSlug(6);
     while (await findLinkBySlug(env.SHORTENER_DB, slug)) {
       attempts++;
-      if (attempts > 5) {
-        slug = generateRandomSlug(7);
-      }
       if (attempts > 10) {
         throw new Error("Failed to generate unique slug");
       }
+      slug = generateRandomSlug(attempts > 5 ? 7 : 6);
     }
   }
 

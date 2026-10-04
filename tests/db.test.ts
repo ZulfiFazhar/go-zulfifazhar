@@ -225,4 +225,68 @@ describe("createShortLink Service", () => {
       createShortLink(env, { url: "https://example.com", customSlug: "taken-slug" })
     ).rejects.toThrow("Slug already in use");
   });
+
+  it("regenerates random slug on collision until a unique slug is found", async () => {
+    const { env, mockDb } = createMockEnv();
+    let collisionCount = 0;
+    const queriedSlugs: string[] = [];
+
+    (mockDb.prepare as any) = mock((query: string) => {
+      let boundArgs: any[] = [];
+      const stmt = {
+        bind: mock((...args: any[]) => {
+          boundArgs = args;
+          return stmt;
+        }),
+        run: mock(async () => ({ success: true, meta: { changes: 1 } })),
+        first: mock(async <T>() => {
+          if (query.includes("FROM links WHERE slug = ?")) {
+            const slug = boundArgs[0];
+            queriedSlugs.push(slug);
+            if (collisionCount < 2) {
+              collisionCount++;
+              return { id: "existing", slug } as unknown as T;
+            }
+            return null;
+          }
+          return null;
+        }),
+        all: mock(async <T>() => ({ success: true, results: [] as unknown as T[] })),
+      };
+      return stmt;
+    });
+
+    const result = await createShortLink(env, { url: "https://example.com" });
+    expect(result.slug).toBeDefined();
+    expect(queriedSlugs.length).toBe(3);
+    expect(queriedSlugs[0]).not.toBe(queriedSlugs[1]);
+    expect(queriedSlugs[1]).not.toBe(queriedSlugs[2]);
+    expect(result.slug).toBe(queriedSlugs[2]);
+  });
+
+  it("throws error when random slug collisions exceed retry limit", async () => {
+    const { env, mockDb } = createMockEnv();
+    (mockDb.prepare as any) = mock((query: string) => {
+      let boundArgs: any[] = [];
+      const stmt = {
+        bind: mock((...args: any[]) => {
+          boundArgs = args;
+          return stmt;
+        }),
+        run: mock(async () => ({ success: true, meta: { changes: 1 } })),
+        first: mock(async <T>() => {
+          if (query.includes("FROM links WHERE slug = ?")) {
+            return { id: "existing", slug: boundArgs[0] } as unknown as T;
+          }
+          return null;
+        }),
+        all: mock(async <T>() => ({ success: true, results: [] as unknown as T[] })),
+      };
+      return stmt;
+    });
+
+    expect(
+      createShortLink(env, { url: "https://example.com" })
+    ).rejects.toThrow("Failed to generate unique slug");
+  });
 });
