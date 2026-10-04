@@ -63,6 +63,9 @@ export function LineChart({
     return { x, y, data: d };
   });
 
+  const activePt = points.find((p) => p.data.timestamp === activePoint?.timestamp);
+  const step = data.length > 1 ? chartWidth / (data.length - 1) : chartWidth;
+
   const linePath = generateSmoothPath(points);
   const areaPath =
     points.length > 0
@@ -116,6 +119,7 @@ export function LineChart({
         <div className="w-full overflow-hidden rounded-xl bg-gradient-to-b from-[#fafafa] to-white p-2">
           <svg
             viewBox={`0 0 ${width} ${height}`}
+            onMouseLeave={() => setActivePoint(null)}
             className="w-full h-auto overflow-visible select-none"
           >
             <defs>
@@ -144,6 +148,21 @@ export function LineChart({
               strokeWidth="1"
             />
 
+            {/* Active vertical straight guideline */}
+            {activePt && (
+              <line
+                x1={activePt.x}
+                y1={paddingTop}
+                x2={activePt.x}
+                y2={paddingTop + chartHeight}
+                stroke="#ff5e1f"
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                opacity="0.6"
+                className="pointer-events-none transition-all duration-150"
+              />
+            )}
+
             {/* Area fill under curve */}
             {areaPath && (
               <path d={areaPath} fill="url(#dashboardAreaGrad)" className="transition-all" />
@@ -164,30 +183,56 @@ export function LineChart({
               />
             )}
 
-            {/* Interactive Data points & X Labels */}
+            {/* Full vertical column hit-test slices */}
+            {points.map((pt, i) => {
+              const sliceX = i === 0 ? 0 : pt.x - step / 2;
+              const sliceW =
+                i === 0
+                  ? paddingX + step / 2
+                  : i === points.length - 1
+                    ? step / 2 + paddingX
+                    : step;
+
+              return (
+                <rect
+                  key={`hit-${pt.data.timestamp}`}
+                  x={sliceX}
+                  y={0}
+                  width={sliceW}
+                  height={height}
+                  fill="transparent"
+                  className="cursor-pointer"
+                  onMouseEnter={() => setActivePoint(pt.data)}
+                />
+              );
+            })}
+
+            {/* Visual Data points & X Labels */}
             {points.map((pt) => {
               const isActive = activePoint?.timestamp === pt.data.timestamp;
               return (
-                <g key={pt.data.timestamp} className="cursor-pointer">
-                  {/* Invisible generous hover target */}
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r="16"
-                    fill="transparent"
-                    onMouseEnter={() => setActivePoint(pt.data)}
-                    onMouseLeave={() => setActivePoint(null)}
-                  />
+                <g key={pt.data.timestamp} className="pointer-events-none">
+                  {/* Subtle active glow ring */}
+                  {isActive && (
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r="10"
+                      fill="#ff5e1f"
+                      opacity="0.18"
+                      className="animate-pulse"
+                    />
+                  )}
 
-                  {/* Visual Circle */}
+                  {/* Visual Circle dot */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={isActive ? "5" : "3.5"}
+                    r={isActive ? "5.5" : "3.5"}
                     className="transition-all duration-150"
                     fill={isActive ? "#ff5e1f" : "#ffffff"}
                     stroke="#ff5e1f"
-                    strokeWidth="2"
+                    strokeWidth={isActive ? "2.5" : "2"}
                   />
 
                   {/* X axis hour label */}
@@ -195,7 +240,9 @@ export function LineChart({
                     x={pt.x}
                     y={height - 6}
                     textAnchor="middle"
-                    className="text-[10px] font-mono fill-neutral-400 select-none pointer-events-none"
+                    className={`text-[10px] font-mono select-none transition-colors ${
+                      isActive ? "fill-[#ff5e1f] font-semibold" : "fill-neutral-400"
+                    }`}
                   >
                     {pt.data.label}
                   </text>
