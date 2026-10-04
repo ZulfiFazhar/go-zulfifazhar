@@ -3,32 +3,32 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "go-zulfifazhar",
-  "compatibility_date": "2025-10-08",
-  "main": "./workers/app.ts",
-  "d1_databases": [
-    {
-      "binding": "SHORTENER_DB",
-      "database_name": "shortener-db",
-      "database_id": "shortener-db-local"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "SHORTENER_CACHE",
-      "id": "shortener-cache-local"
-    }
-  ],
-  "vars": {
-    "VALUE_FROM_CLOUDFLARE": "Hello from Hono/CF",
-    "BASE_URL": "http://localhost:5173",
-    "JWT_SECRET": "dev-jwt-secret-replace-in-production-min32chars",
-    "GOOGLE_CLIENT_ID": "dev-google-client-id",
-    "GOOGLE_CLIENT_SECRET": "dev-google-client-secret"
-  },
-  "observability": {
-    "enabled": true
-  },
-  "upload_source_maps": true
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "go-zulfifazhar",
+	"compatibility_date": "2025-10-08",
+	"main": "./workers/app.ts",
+	"d1_databases": [
+		{
+			"binding": "SHORTENER_DB",
+			"database_name": "shortener-db",
+			"database_id": "fe1c2b63-62c4-4cd7-879e-cc0887a9649f"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "SHORTENER_CACHE",
+			"id": "441f05dfe10245e7b9314d7fc40ed0c3"
+		}
+	],
+	"vars": {
+		"VALUE_FROM_CLOUDFLARE": "Hello from Hono/CF",
+		"BASE_URL": "http://localhost:5173",
+		"JWT_SECRET": "dev-jwt-secret-replace-in-production-min32chars",
+		"GOOGLE_CLIENT_ID": "dev-google-client-id",
+		"GOOGLE_CLIENT_SECRET": "dev-google-client-secret"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
 }
