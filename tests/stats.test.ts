@@ -1,8 +1,27 @@
 import { describe, it, expect, mock } from "bun:test";
 import app from "../workers/app";
-import { getPublicPlatformStats } from "../workers/db/queries";
+import { getPublicPlatformStats, getUserClickTrend } from "../workers/db/queries";
 
 describe("Public Platform Stats", () => {
+  it("calculates user 24h click trend", async () => {
+    const now = Date.now();
+    const mockDb = {
+      prepare: mock(() => {
+        const stmt = {
+          bind: mock(() => stmt),
+          all: mock(async () => ({
+            results: [{ timestamp: now - 1800 * 1000 }, { timestamp: now - 3600 * 1000 }],
+          })),
+        };
+        return stmt;
+      }),
+    } as unknown as D1Database;
+
+    const trend = await getUserClickTrend(mockDb, "test_user_id");
+    expect(trend.length).toBe(8);
+    const totalTrend = trend.reduce((sum, p) => sum + p.clicks, 0);
+    expect(totalTrend).toBe(2);
+  });
   it("calculates total links, total clicks, and 24h trend buckets", async () => {
     const now = Date.now();
     const mockDb = {

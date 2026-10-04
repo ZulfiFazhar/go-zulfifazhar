@@ -6,11 +6,10 @@ import { ShortenBox, type ShortenResult } from "../components/shorten-box";
 import { FeaturesGrid } from "../components/features-grid";
 import { RecentLinks, type RecentLinkItem } from "../components/recent-links";
 import { AnimatedBackground } from "../components/animated-background";
-import { LiveStatsChart, type PlatformStats } from "../components/live-stats-chart";
 import { Badge } from "../components/ui/badge";
 import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
-import { listUserLinks, getPublicPlatformStats } from "../../workers/db/queries";
+import { listUserLinks, getPublicPlatformStats, type PublicStats } from "../../workers/db/queries";
 import { claimLocalHistory } from "../lib/local-history";
 
 export function meta({}: Route.MetaArgs) {
@@ -27,7 +26,7 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request, context }: Route.LoaderArgs) {
   let user: NavbarUser | null = null;
   let recentLinks: RecentLinkItem[] = [];
-  let platformStats: PlatformStats = {
+  let platformStats: PublicStats = {
     totalClicks: 0,
     totalLinks: 0,
     trend: [],
@@ -77,8 +76,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user ?? null;
   const initialRecent = loaderData?.recentLinks ?? [];
-  const initialStats = loaderData?.platformStats;
   const [recentLinks, setRecentLinks] = React.useState<RecentLinkItem[]>(initialRecent);
+  const [liveClicks, setLiveClicks] = React.useState(loaderData?.platformStats?.totalClicks ?? 0);
+
+  // Poll global stats every 5s for realtime click counter
+  React.useEffect(() => {
+    const pollStats = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch("/api/stats/public");
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (typeof data.totalClicks === "number") {
+            setLiveClicks(data.totalClicks);
+          }
+        }
+      } catch {}
+    };
+
+    const timer = setInterval(pollStats, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Sync state if loader data changes
   React.useEffect(() => {
@@ -130,7 +148,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 className="mb-6 gap-2 rounded-full border border-[#ffefe8] bg-[#ffefe8] px-4 py-1.5 text-xs font-semibold text-[#ff5e1f]"
               >
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ff5e1f] animate-pulse" />
-                <span>go.zulfifazhar.dev • Cloudflare Edge Shortener</span>
+                <span>
+                  {liveClicks > 0
+                    ? `${liveClicks.toLocaleString()} edge clicks routed live`
+                    : "go.zulfifazhar.dev • Cloudflare Edge Shortener"}
+                </span>
               </Badge>
             </motion.div>
 
@@ -166,9 +188,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             {/* Recent Links (Local History or User Synced) */}
             <RecentLinks user={user} serverLinks={recentLinks} />
-
-            {/* Real-time Edge Activity & Line Chart */}
-            <LiveStatsChart initialStats={initialStats} />
           </div>
         </section>
 

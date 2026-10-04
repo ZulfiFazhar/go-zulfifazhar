@@ -253,3 +253,39 @@ export async function getPublicPlatformStats(db: D1Database): Promise<PublicStat
     trend,
   };
 }
+
+export async function getUserClickTrend(
+  db: D1Database,
+  userId: string
+): Promise<PublicTrendPoint[]> {
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+  const clicksRes = await db
+    .prepare(
+      `SELECT lc.timestamp
+       FROM link_clicks lc
+       JOIN links l ON lc.link_id = l.id
+       WHERE l.user_id = ? AND lc.timestamp >= ?
+       ORDER BY lc.timestamp ASC`
+    )
+    .bind(userId, oneDayAgo)
+    .all<{ timestamp: number }>();
+
+  const timestamps = (clicksRes.results || []).map((r) => r.timestamp);
+
+  const slotCount = 8;
+  const slotDuration = (24 * 60 * 60 * 1000) / slotCount;
+  const trend: PublicTrendPoint[] = [];
+
+  for (let i = 0; i < slotCount; i++) {
+    const slotStart = oneDayAgo + i * slotDuration;
+    const slotEnd = slotStart + slotDuration;
+    const count = timestamps.filter((ts) => ts >= slotStart && ts < slotEnd).length;
+    const date = new Date(slotEnd);
+    const label = `${date.getUTCHours().toString().padStart(2, "0")}:00`;
+    trend.push({ timestamp: slotEnd, label, clicks: count });
+  }
+
+  return trend;
+}

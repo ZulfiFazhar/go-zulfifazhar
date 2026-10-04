@@ -12,9 +12,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../co
 import { Badge } from "../components/ui/badge";
 import { cloudflareContext } from "../context";
 import { verifySessionJwt } from "../../workers/modules/auth/auth.service";
-import { listUserLinks } from "../../workers/db/queries";
+import { listUserLinks, getUserClickTrend, type PublicTrendPoint } from "../../workers/db/queries";
 import { Link2, BarChart3, TrendingUp, PlusCircle } from "lucide-react";
 import { claimLocalHistory } from "../lib/local-history";
+import { LineChart } from "../components/line-chart";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -49,6 +50,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   let links: DashboardLinkItem[] = [];
+  let trend: PublicTrendPoint[] = [];
   try {
     const cf = context.get(cloudflareContext);
     if (cf?.env?.SHORTENER_DB) {
@@ -65,17 +67,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         clicks: record.clicks,
         createdAt: record.created_at,
       }));
+
+      trend = await getUserClickTrend(cf.env.SHORTENER_DB, user.userId);
     }
   } catch {
     // If database query fails, fallback to empty array
   }
 
-  return { user, links };
+  return { user, links, trend };
 }
 
 export default function Dashboard({ loaderData }: Route.ComponentProps) {
   const user = loaderData?.user;
   const initialLinks = loaderData?.links ?? [];
+  const trend = loaderData?.trend ?? [];
   const [links, setLinks] = React.useState<DashboardLinkItem[]>(initialLinks);
 
   // Sync state when loaderData changes
@@ -232,6 +237,9 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
               </div>
             </Card>
           </motion.div>
+
+          {/* 24-Hour Click Traffic Line Chart */}
+          <LineChart data={trend} />
 
           {/* Shorten Section */}
           <Card className="mb-8 p-6 border-[#f0f0f0] shadow-xs">
