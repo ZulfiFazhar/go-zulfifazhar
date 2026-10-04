@@ -60,6 +60,12 @@ describe("Public Platform Stats", () => {
     expect(trend.length).toBe(8);
     const totalTrend = trend.reduce((sum, p) => sum + p.clicks, 0);
     expect(totalTrend).toBe(2);
+
+    const trend7d = await getUserClickTrend(mockDb, "test_user_id", "7d");
+    expect(trend7d.length).toBe(7);
+
+    const trend30d = await getUserClickTrend(mockDb, "test_user_id", "30d");
+    expect(trend30d.length).toBe(10);
   });
   it("calculates total links, total clicks, and 24h trend buckets", async () => {
     const now = Date.now();

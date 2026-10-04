@@ -7,6 +7,7 @@ import {
   deleteUserLink,
   claimAnonymousLinks,
   getPublicPlatformStats,
+  getUserClickTrend,
   type LinkRecord,
 } from "../../db/queries";
 import { authMiddleware, requireAuth } from "../auth/auth.middleware";
@@ -183,9 +184,29 @@ export async function handleGetPublicStats(c: Context<AppEnv>) {
   }
 }
 
+export async function handleGetUserTrend(c: Context<AppEnv>) {
+  const user = c.get("user");
+  if (!user?.userId) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const queryRange = c.req.query("range") || "24h";
+  const range: "24h" | "7d" | "30d" = ["24h", "7d", "30d"].includes(queryRange)
+    ? (queryRange as any)
+    : "24h";
+
+  try {
+    const trend = await getUserClickTrend(c.env.SHORTENER_DB, user.userId, range);
+    return c.json({ success: true, trend, range });
+  } catch (err: any) {
+    return c.json({ error: err?.message || "Failed to load click trend" }, 500);
+  }
+}
+
 export const linksRoutes = new Hono<AppEnv>();
 linksRoutes.use("*", authMiddleware);
 linksRoutes.get("/stats/public", handleGetPublicStats);
+linksRoutes.get("/trend", requireAuth, handleGetUserTrend);
 linksRoutes.post("/", handleCreateLink);
 linksRoutes.post("/links", handleCreateLink);
 linksRoutes.post("/claim", requireAuth, handleClaimLinks);
@@ -197,5 +218,6 @@ linksRoutes.delete("/user/links/:id", requireAuth, handleDeleteUserLink);
 export const userLinksRoutes = new Hono<AppEnv>();
 userLinksRoutes.use("*", authMiddleware, requireAuth);
 userLinksRoutes.get("/", handleListUserLinks);
+userLinksRoutes.get("/trend", handleGetUserTrend);
 userLinksRoutes.post("/claim", handleClaimLinks);
 userLinksRoutes.delete("/:id", handleDeleteUserLink);

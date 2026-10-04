@@ -260,10 +260,22 @@ export async function getPublicPlatformStats(db: D1Database): Promise<PublicStat
 
 export async function getUserClickTrend(
   db: D1Database,
-  userId: string
+  userId: string,
+  range: "24h" | "7d" | "30d" = "24h"
 ): Promise<PublicTrendPoint[]> {
   const now = Date.now();
-  const oneDayAgo = now - 24 * 60 * 60 * 1000;
+  let duration = 24 * 60 * 60 * 1000;
+  let slotCount = 8;
+
+  if (range === "7d") {
+    duration = 7 * 24 * 60 * 60 * 1000;
+    slotCount = 7;
+  } else if (range === "30d") {
+    duration = 30 * 24 * 60 * 60 * 1000;
+    slotCount = 10;
+  }
+
+  const startTime = now - duration;
 
   const clicksRes = await db
     .prepare(
@@ -273,21 +285,23 @@ export async function getUserClickTrend(
        WHERE l.user_id = ? AND lc.timestamp >= ?
        ORDER BY lc.timestamp ASC`
     )
-    .bind(userId, oneDayAgo)
+    .bind(userId, startTime)
     .all<{ timestamp: number }>();
 
   const timestamps = (clicksRes.results || []).map((r) => r.timestamp);
 
-  const slotCount = 8;
-  const slotDuration = (24 * 60 * 60 * 1000) / slotCount;
+  const slotDuration = duration / slotCount;
   const trend: PublicTrendPoint[] = [];
 
   for (let i = 0; i < slotCount; i++) {
-    const slotStart = oneDayAgo + i * slotDuration;
+    const slotStart = startTime + i * slotDuration;
     const slotEnd = slotStart + slotDuration;
     const count = timestamps.filter((ts) => ts >= slotStart && ts < slotEnd).length;
     const date = new Date(slotEnd);
-    const label = `${date.getUTCHours().toString().padStart(2, "0")}:00`;
+    const label =
+      range === "24h"
+        ? `${date.getUTCHours().toString().padStart(2, "0")}:00`
+        : `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
     trend.push({ timestamp: slotEnd, label, clicks: count });
   }
 

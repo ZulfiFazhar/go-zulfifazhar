@@ -1,8 +1,10 @@
 import * as React from "react";
-import { motion } from "framer-motion";
-import { TrendingUp, Activity } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, Activity, Globe2, Loader2 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
+
+export type TimeRange = "24h" | "7d" | "30d";
 
 export interface ChartPoint {
   timestamp: number;
@@ -14,7 +16,18 @@ interface LineChartProps {
   data: ChartPoint[];
   title?: string;
   subtitle?: string;
+  initialRange?: TimeRange;
 }
+
+const COMMON_TIMEZONES = [
+  { value: "LOCAL", label: "Local (Browser)" },
+  { value: "UTC", label: "UTC" },
+  { value: "Asia/Jakarta", label: "WIB (Jakarta)" },
+  { value: "Asia/Singapore", label: "SGT (Singapore)" },
+  { value: "America/New_York", label: "EST (New York)" },
+  { value: "Europe/London", label: "GMT (London)" },
+  { value: "Asia/Tokyo", label: "JST (Tokyo)" },
+];
 
 function generateSmoothPath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) return "";
@@ -38,11 +51,98 @@ function generateSmoothPath(points: Array<{ x: number; y: number }>): string {
 }
 
 export function LineChart({
-  data = [],
-  title = "24-Hour Click Analytics",
-  subtitle = "Hourly click distribution across all your active shortlinks",
+  data: initialData = [],
+  title = "Click Traffic Analytics",
+  subtitle = "Edge click distribution across your active shortlinks",
+  initialRange = "24h",
 }: LineChartProps) {
+  const [range, setRange] = React.useState<TimeRange>(initialRange);
+  const [data, setData] = React.useState<ChartPoint[]>(initialData);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [activePoint, setActivePoint] = React.useState<ChartPoint | null>(null);
+
+  // Timezone state
+  const [selectedTz, setSelectedTz] = React.useState<string>("LOCAL");
+  const [effectiveTz, setEffectiveTz] = React.useState<string>("UTC");
+
+  React.useEffect(() => {
+    try {
+      const local = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      setEffectiveTz(selectedTz === "LOCAL" ? local : selectedTz);
+    } catch {
+      setEffectiveTz("UTC");
+    }
+  }, [selectedTz]);
+
+  // Sync with initialData changes
+  React.useEffect(() => {
+    if (range === initialRange) {
+      setData(initialData);
+    }
+  }, [initialData, range, initialRange]);
+
+  // Fetch when range changes
+  const handleRangeChange = async (newRange: TimeRange) => {
+    if (newRange === range) return;
+    setRange(newRange);
+    setIsLoading(true);
+    setActivePoint(null);
+
+    try {
+      const res = await fetch(`/api/user/links/trend?range=${newRange}`);
+      if (res.ok) {
+        const json = (await res.json()) as any;
+        if (Array.isArray(json.trend)) {
+          setData(json.trend);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch trend:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Format label for point on X axis
+  const formatAxisLabel = (timestamp: number) => {
+    try {
+      const d = new Date(timestamp);
+      if (range === "24h") {
+        return new Intl.DateTimeFormat("en-US", {
+          timeZone: effectiveTz,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(d);
+      } else {
+        return new Intl.DateTimeFormat("en-US", {
+          timeZone: effectiveTz,
+          month: "numeric",
+          day: "numeric",
+        }).format(d);
+      }
+    } catch {
+      return new Date(timestamp).toISOString().slice(11, 16);
+    }
+  };
+
+  // Format detailed tooltip string
+  const formatTooltipLabel = (timestamp: number) => {
+    try {
+      const d = new Date(timestamp);
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: effectiveTz,
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZoneName: "short",
+      }).format(d);
+    } catch {
+      return new Date(timestamp).toUTCString();
+    }
+  };
 
   const maxClicks = Math.max(...data.map((d) => d.clicks), 5);
   const totalPeriodClicks = data.reduce((acc, d) => acc + d.clicks, 0);
@@ -74,30 +174,64 @@ export function LineChart({
 
   return (
     <Card className="mb-8 p-5 sm:p-6 border-[#f0f0f0] shadow-xs bg-white">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f5f5f5] pb-4">
+      {/* Header with Title and Range + Timezone controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#f5f5f5] pb-4">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ffefe8] text-[#ff5e1f]">
             <TrendingUp className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[#262626]">{title}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-[#262626]">{title}</h3>
+              {isLoading && <Loader2 className="h-3 w-3 animate-spin text-[#ff5e1f]" />}
+            </div>
             <p className="text-xs text-neutral-400">{subtitle}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="font-mono text-xs font-semibold text-[#262626]">
-              {totalPeriodClicks.toLocaleString()} clicks / 24h
-            </span>
+        {/* Range toggles & Timezone selector */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Timezone Dropdown */}
+          <div className="flex items-center gap-1.5 rounded-full border border-[#f0f0f0] bg-[#fafafa] px-2.5 py-1 text-xs text-neutral-600">
+            <Globe2 className="h-3 w-3 text-neutral-400" />
+            <select
+              value={selectedTz}
+              onChange={(e) => setSelectedTz(e.target.value)}
+              className="bg-transparent text-[11px] font-medium text-[#262626] outline-none cursor-pointer"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Time Range Pills */}
+          <div className="flex items-center rounded-full border border-[#f0f0f0] bg-[#fafafa] p-0.5">
+            {(["24h", "7d", "30d"] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => handleRangeChange(r)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
+                  range === r
+                    ? "bg-white text-[#ff5e1f] shadow-2xs font-semibold"
+                    : "text-neutral-500 hover:text-[#262626]"
+                }`}
+              >
+                {r.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Period Clicks Badge */}
           <Badge
             variant="outline"
-            className="flex items-center gap-1.5 rounded-full border-[#f0f0f0] bg-[#fafafa] px-2.5 py-0.5 text-[11px] text-neutral-600"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border-[#f0f0f0] bg-[#fafafa] px-2.5 py-1 text-[11px] text-neutral-600"
           >
             <Activity className="h-3 w-3 text-[#ff5e1f]" />
-            <span>Edge Aggregated</span>
+            <span>{totalPeriodClicks.toLocaleString()} clicks</span>
           </Badge>
         </div>
       </div>
@@ -105,14 +239,14 @@ export function LineChart({
       {/* SVG Interactive Line Chart */}
       <div className="mt-4 relative">
         <div className="mb-2 flex items-center justify-between text-xs text-neutral-400">
-          <span>Click volume trend</span>
+          <span>Click trend ({range.toUpperCase()})</span>
           {activePoint ? (
             <span className="font-mono text-[#ff5e1f] font-semibold">
-              {activePoint.label} UTC • {activePoint.clicks}{" "}
+              {formatTooltipLabel(activePoint.timestamp)} • {activePoint.clicks}{" "}
               {activePoint.clicks === 1 ? "click" : "clicks"}
             </span>
           ) : (
-            <span>Hover points for breakdown</span>
+            <span>Hover points along vertical slice for breakdown</span>
           )}
         </div>
 
@@ -171,9 +305,10 @@ export function LineChart({
             {/* Smooth stroke line */}
             {linePath && (
               <motion.path
+                key={linePath}
                 initial={{ pathLength: 0 }}
                 animate={{ pathLength: 1 }}
-                transition={{ duration: 1, ease: "easeOut" }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
                 d={linePath}
                 fill="none"
                 stroke="#ff5e1f"
@@ -235,7 +370,7 @@ export function LineChart({
                     strokeWidth={isActive ? "2.5" : "2"}
                   />
 
-                  {/* X axis hour label */}
+                  {/* X axis hour / date label */}
                   <text
                     x={pt.x}
                     y={height - 6}
@@ -244,7 +379,7 @@ export function LineChart({
                       isActive ? "fill-[#ff5e1f] font-semibold" : "fill-neutral-400"
                     }`}
                   >
-                    {pt.data.label}
+                    {formatAxisLabel(pt.data.timestamp)}
                   </text>
                 </g>
               );
