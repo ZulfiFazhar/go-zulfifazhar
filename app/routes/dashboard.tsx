@@ -1,5 +1,6 @@
 import * as React from "react";
 import { redirect } from "react-router";
+import { motion } from "framer-motion";
 import type { Route } from "./+types/dashboard";
 import { Navbar, type NavbarUser } from "../components/navbar";
 import { ShortenBox, type ShortenResult } from "../components/shorten-box";
@@ -144,7 +145,12 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
           </div>
 
           {/* Stats Summary Cards */}
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3"
+          >
             {/* Total Links */}
             <Card className="p-5 border-[#f0f0f0] shadow-xs">
               <div className="flex items-center justify-between">
@@ -208,7 +214,7 @@ export default function Dashboard({ loaderData }: Route.ComponentProps) {
                 </p>
               </div>
             </Card>
-          </div>
+          </motion.div>
 
           {/* Shorten Section */}
           <Card className="mb-8 p-6 border-[#f0f0f0] shadow-xs">

@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Zap, BarChart3, KeyRound } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 
@@ -48,27 +49,32 @@ export function FeaturesGrid() {
         {features.map((feature, idx) => {
           const Icon = feature.icon;
           return (
-            <Card
+            <motion.div
               key={idx}
-              className="rounded-2xl border border-[#f0f0f0] bg-white p-6 sm:p-8 transition-all duration-200 hover:border-[#ff5e1f]/30 hover:shadow-md"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.45, delay: idx * 0.12 }}
             >
-              <CardHeader className="p-0 mb-4">
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ffefe8] text-[#ff5e1f]">
-                  <Icon className="h-6 w-6 stroke-[2]" />
-                </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#ff5e1f]">
-                  {feature.highlight}
-                </span>
-                <CardTitle className="mt-1 text-lg font-medium text-[#262626]">
-                  {feature.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <p className="text-sm leading-relaxed text-neutral-600">
-                  {feature.description}
-                </p>
-              </CardContent>
-            </Card>
+              <Card className="h-full rounded-2xl border border-[#f0f0f0] bg-white p-6 sm:p-8 transition-all duration-200 hover:border-[#ff5e1f]/30 hover:shadow-md">
+                <CardHeader className="p-0 mb-4">
+                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ffefe8] text-[#ff5e1f]">
+                    <Icon className="h-6 w-6 stroke-[2]" />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#ff5e1f]">
+                    {feature.highlight}
+                  </span>
+                  <CardTitle className="mt-1 text-lg font-medium text-[#262626]">
+                    {feature.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <p className="text-sm leading-relaxed text-neutral-600">
+                    {feature.description}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           );
         })}
       </div>

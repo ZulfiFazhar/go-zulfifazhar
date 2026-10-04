@@ -1,4 +1,5 @@
 import type { Route } from "./+types/home";
+import { motion } from "framer-motion";
 import { Navbar, type NavbarUser } from "../components/navbar";
 import { ShortenBox } from "../components/shorten-box";
 import { FeaturesGrid } from "../components/features-grid";
@@ -49,28 +50,49 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <section className="relative mx-auto max-w-6xl px-4 pt-12 pb-16 sm:px-6 sm:pt-20 sm:pb-24">
           <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
             {/* Pill chip badge */}
-            <Badge
-              variant="secondary"
-              className="mb-6 gap-2 rounded-full border border-[#ffefe8] bg-[#ffefe8] px-4 py-1.5 text-xs font-semibold text-[#ff5e1f]"
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
             >
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ff5e1f] animate-pulse" />
-              <span>go.zulfifazhar.dev • Cloudflare Edge Shortener</span>
-            </Badge>
+              <Badge
+                variant="secondary"
+                className="mb-6 gap-2 rounded-full border border-[#ffefe8] bg-[#ffefe8] px-4 py-1.5 text-xs font-semibold text-[#ff5e1f]"
+              >
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#ff5e1f] animate-pulse" />
+                <span>go.zulfifazhar.dev • Cloudflare Edge Shortener</span>
+              </Badge>
+            </motion.div>
 
             {/* Hero Title */}
-            <h1 className="text-4xl font-medium tracking-tight text-[#262626] sm:text-5xl md:text-6xl md:leading-[1.15]">
+            <motion.h1
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="text-4xl font-medium tracking-tight text-[#262626] sm:text-5xl md:text-6xl md:leading-[1.15]"
+            >
               Shorten links. Accelerate clicks at the edge.
-            </h1>
+            </motion.h1>
 
             {/* Subtitle */}
-            <p className="mt-5 max-w-xl text-base text-neutral-600 sm:text-lg sm:leading-relaxed">
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mt-5 max-w-xl text-base text-neutral-600 sm:text-lg sm:leading-relaxed"
+            >
               Global sub-millisecond redirections powered by Cloudflare Workers and KV storage. Instant propagation, real-time analytics, and custom vanity slugs.
-            </p>
+            </motion.p>
 
             {/* Shorten Box */}
-            <div className="mt-8 sm:mt-10 w-full">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mt-8 sm:mt-10 w-full"
+            >
               <ShortenBox user={user} />
-            </div>
+            </motion.div>
           </div>
         </section>
 
