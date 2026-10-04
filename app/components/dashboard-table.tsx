@@ -110,9 +110,9 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
             <TableRow className="bg-[#f7f7f7]/80 hover:bg-[#f7f7f7]/80">
               <TableHead className="font-semibold text-[#262626]">Short Link</TableHead>
               <TableHead className="font-semibold text-[#262626]">Destination URL</TableHead>
-              <TableHead className="font-semibold text-[#262626]">Clicks</TableHead>
-              <TableHead className="font-semibold text-[#262626]">Created</TableHead>
-              <TableHead className="text-right font-semibold text-[#262626]">Actions</TableHead>
+              <TableHead className="font-semibold text-[#262626] whitespace-nowrap">Clicks</TableHead>
+              <TableHead className="font-semibold text-[#262626] whitespace-nowrap">Created</TableHead>
+              <TableHead className="text-right font-semibold text-[#262626] whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,10 +167,10 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
                     </TableCell>
 
                     {/* Click count pill badge */}
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <Badge
                         variant="secondary"
-                        className="rounded-full bg-[#ffefe8] px-2.5 py-0.5 font-mono text-xs font-semibold text-[#ff5e1f]"
+                        className="rounded-full bg-[#ffefe8] px-2.5 py-0.5 font-mono text-xs font-semibold text-[#ff5e1f] whitespace-nowrap"
                       >
                         {link.clicks} {link.clicks === 1 ? "click" : "clicks"}
                       </Badge>
@@ -182,7 +182,7 @@ export function DashboardTable({ links, onDelete }: DashboardTableProps) {
                     </TableCell>
 
                     {/* Actions */}
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
                         {/* Copy button */}
                         <Button

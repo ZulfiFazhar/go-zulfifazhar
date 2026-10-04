@@ -20,15 +20,14 @@
 			"id": "441f05dfe10245e7b9314d7fc40ed0c3"
 		}
 	],
-	"vars": {
-		"VALUE_FROM_CLOUDFLARE": "Hello from Hono/CF",
-		"BASE_URL": "http://localhost:5173",
-		"JWT_SECRET": "dev-jwt-secret-replace-in-production-min32chars",
-		"GOOGLE_CLIENT_ID": "dev-google-client-id",
-		"GOOGLE_CLIENT_SECRET": "dev-google-client-secret"
-	},
 	"observability": {
-		"enabled": true
-	},
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false
+    }
+  },
 	"upload_source_maps": true
 }
