@@ -23,6 +23,15 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+export const meta: Route.MetaFunction = () => [
+  { title: "go.zulfifazhar.dev • Cloudflare Edge Shortener" },
+  {
+    name: "description",
+    content:
+      "Lightning-fast URL shortener powered by Cloudflare Workers and KV. Global edge redirects, real-time analytics, and custom slugs.",
+  },
+];
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -32,7 +41,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="min-h-screen bg-white text-[#262626] font-sans antialiased selection:bg-[#ffefe8] selection:text-[#ff5e1f]">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -63,10 +72,10 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
+      <h1 className="text-2xl font-bold text-[#262626]">{message}</h1>
+      <p className="mt-2 text-neutral-600">{details}</p>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre className="w-full p-4 mt-4 overflow-x-auto rounded bg-[#f7f7f7] text-xs font-mono text-neutral-800">
           <code>{stack}</code>
         </pre>
       )}
